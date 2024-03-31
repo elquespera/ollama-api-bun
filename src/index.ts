@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
-import { stream } from "hono/streaming";
-import { StatusCode } from "hono/utils/http-status";
+import { ollama } from "./ollama-route";
+import { basicAuth } from "hono/basic-auth";
 import { verifyHMAC } from "./hmac";
 
-const ollamaURL = "http://localhost:11434/api";
+const ollamaUser = process.env.OLLAMA_API_USER!;
+const ollamaSecret = process.env.OLLAMA_API_SECRET!;
 
 const app = new Hono();
 
@@ -12,54 +13,19 @@ app.use(logger());
 
 app.get("/", (c) => c.json({ status: "Running" }));
 
-app.post("/api/ollama/:route", async (c) => {
-  const route = c.req.param("route");
-
-  console.log("ollama:", route);
-
+app.use("api/*", async (c, next) => {
+  const route = c.req.path;
   const body = JSON.stringify(await c.req.json());
-
-  const isAuth = verifyHMAC(
-    c.req.header("authorization"),
-    `/api/ollama/${route}`,
-    "POST",
-    body
-  );
+  const isAuth = verifyHMAC(c.req.header("authorization"), route, "POST", body);
 
   if (!isAuth) {
-    return c.body("Unauthorized request.", 401);
+    return c.json({ error: "Unauthorized request." }, 401);
   }
 
-  try {
-    const ollamaResponse = await fetch(`${ollamaURL}/${route}`, {
-      method: "POST",
-      body,
-      headers: {
-        "content-type": "application/json",
-      },
-    });
-
-    if (!ollamaResponse.ok) {
-      const status = ollamaResponse.status as StatusCode;
-      c.status(status);
-      return c.body(ollamaResponse.statusText, status);
-    }
-
-    return stream(c, async (stream) => {
-      stream.onAbort(() => {
-        console.log("Aborted!");
-      });
-
-      if (ollamaResponse.body) {
-        await stream.pipe(ollamaResponse.body);
-      }
-      await stream.close();
-    });
-  } catch (error) {
-    console.error(String(error));
-    throw error;
-  }
+  await next();
 });
+
+app.route("/api/ollama", ollama);
 
 export default {
   port: process.env.PORT || 3000,
