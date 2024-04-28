@@ -1,18 +1,17 @@
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { StatusCode } from "hono/utils/http-status";
+import { ollamaApiURL } from "./constants";
 
-const ollamaURL = "http://localhost:11434/api";
+export const ollamaRoute = new Hono();
 
-export const ollama = new Hono();
-
-ollama.post(":route", async (c) => {
+ollamaRoute.post(":route", async (c) => {
   const route = c.req.param("route");
 
   const body = JSON.stringify(await c.req.json());
 
   try {
-    const ollamaResponse = await fetch(`${ollamaURL}/${route}`, {
+    const ollamaResponse = await fetch(`${ollamaApiURL}/${route}`, {
       method: "POST",
       body,
       headers: { "content-type": "application/json" },

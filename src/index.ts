@@ -1,17 +1,12 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
-import { ollama } from "./ollama-route";
-import { basicAuth } from "hono/basic-auth";
+import { ollamaRoute } from "./ollama-route";
 import { verifyHMAC } from "./hmac";
-
-const ollamaUser = process.env.OLLAMA_API_USER!;
-const ollamaSecret = process.env.OLLAMA_API_SECRET!;
+import { statusRoute } from "./status-route";
 
 const app = new Hono();
 
 app.use(logger());
-
-app.get("/", (c) => c.json({ status: "Running" }));
 
 app.use("api/*", async (c, next) => {
   const route = c.req.path;
@@ -25,7 +20,8 @@ app.use("api/*", async (c, next) => {
   await next();
 });
 
-app.route("/api/ollama", ollama);
+app.route("/api/ollama", ollamaRoute);
+app.route("/status", statusRoute);
 
 export default {
   port: process.env.PORT || 3000,
